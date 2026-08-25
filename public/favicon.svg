@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="TOP-250">
+  <rect width="32" height="32" rx="7" fill="#0a0a0c"/>
+  <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="5.75" fill="none" stroke="#5eead4" stroke-width="1.5"/>
+  <g fill="#5eead4">
+    <!-- 2 -->
+    <rect x="4.1" y="8" width="6.9" height="3" rx="0.9"/>
+    <rect x="8" y="8" width="3" height="8.2" rx="0.9"/>
+    <rect x="4.1" y="14.5" width="6.9" height="3" rx="0.9"/>
+    <rect x="4.1" y="15.8" width="3" height="8.2" rx="0.9"/>
+    <rect x="4.1" y="21" width="6.9" height="3" rx="0.9"/>
+    <!-- 5 -->
+    <rect x="12.55" y="8" width="6.9" height="3" rx="0.9"/>
+    <rect x="12.55" y="8" width="3" height="8.2" rx="0.9"/>
+    <rect x="12.55" y="14.5" width="6.9" height="3" rx="0.9"/>
+    <rect x="16.45" y="15.8" width="3" height="8.2" rx="0.9"/>
+    <rect x="12.55" y="21" width="6.9" height="3" rx="0.9"/>
+    <!-- 0 -->
+    <rect x="21" y="8" width="6.9" height="3" rx="0.9"/>
+    <rect x="21" y="8" width="3" height="16" rx="0.9"/>
+    <rect x="24.9" y="8" width="3" height="16" rx="0.9"/>
+    <rect x="21" y="21" width="6.9" height="3" rx="0.9"/>
+  </g>
+</svg>
