@@ -10,6 +10,8 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/product/$id")({
   loader: async ({ params }) => ({ product: await getProduct({ data: params.id }) }),
+  staleTime: 0,
+  shouldReload: true,
   component: ProductPage,
 });
 

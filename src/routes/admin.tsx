@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -199,12 +199,14 @@ function emptyProduct(): Product {
 function ProductsPanel() {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const router = useRouter();
   const q = useQuery({ queryKey: ["admin-products"], queryFn: () => adminListProducts() });
   const [editing, setEditing] = useState<Product>(emptyProduct());
 
   async function onSaved() {
     await qc.invalidateQueries({ queryKey: ["admin-products"] });
     await qc.invalidateQueries({ queryKey: ["products"] });
+    await router.invalidate();
     setEditing(emptyProduct());
   }
 
@@ -215,6 +217,7 @@ function ProductsPanel() {
       if (editing.id === id) setEditing(emptyProduct());
       await qc.invalidateQueries({ queryKey: ["admin-products"] });
       await qc.invalidateQueries({ queryKey: ["products"] });
+      await router.invalidate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Remove failed");
     }
@@ -318,6 +321,8 @@ function SettingsPanel() {
 
 function ProductForm({ product, onSaved }: { product: Product; onSaved: () => Promise<void> }) {
   const { t } = useI18n();
+  const qc = useQueryClient();
+  const router = useRouter();
   const [p, setP] = useState(product);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -343,6 +348,7 @@ function ProductForm({ product, onSaved }: { product: Product; onSaved: () => Pr
           imageUrl: p.imageUrl,
           stock: p.stock,
           active: p.active,
+          sortOrder: p.sortOrder,
         },
       });
       toast.success(t("toast.product"));
@@ -357,18 +363,26 @@ function ProductForm({ product, onSaved }: { product: Product; onSaved: () => Pr
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 6_000_000) {
-      toast.error("Image is too large. Please use a picture under 6 MB.");
+    if (file.size > 4_500_000) {
+      toast.error("Image is too large. Please use a picture under 4.5 MB.");
       return;
     }
     setUploading(true);
     try {
       const dataBase64 = await readFileAsBase64(file);
       const res = await uploadProductPhoto({
-        data: { filename: file.name, contentType: file.type || "image/jpeg", dataBase64 },
+        data: {
+          filename: file.name,
+          contentType: file.type || "image/jpeg",
+          dataBase64,
+          productId: p.id.trim() || undefined,
+        },
       });
       setP((cur) => ({ ...cur, imageUrl: res.url }));
       toast.success(t("toast.photo"));
+      await qc.invalidateQueries({ queryKey: ["admin-products"] });
+      await qc.invalidateQueries({ queryKey: ["products"] });
+      await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {

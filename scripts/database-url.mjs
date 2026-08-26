@@ -4,10 +4,13 @@
  * DATABASE_URL — treat any of them as "use real Postgres".
  */
 const URL_KEYS = [
+  // node-postgres + Vercel: prefer Neon's direct (session) URL. The pooled
+  // endpoint is PgBouncer transaction mode, which is a poor fit for writes and
+  // multi-statement migrations.
+  "POSTGRES_URL_NON_POOLING",
   "DATABASE_URL",
   "POSTGRES_URL",
   "POSTGRES_PRISMA_URL",
-  "POSTGRES_URL_NON_POOLING",
 ];
 
 /** @param {NodeJS.ProcessEnv} [env] */
