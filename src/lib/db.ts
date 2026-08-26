@@ -1,20 +1,21 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import { isServerlessHost, readDatabaseUrl } from "../../scripts/database-url.mjs";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
 
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
 // "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl =
-  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl =
-  rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
+const databaseUrl = readDatabaseUrl();
+const serverlessHost = isServerlessHost();
 
 /**
- * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
- * sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
- * the app has a working database even with nothing configured — the live preview
- * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
+ * Active backend: real **Neon** when `DATABASE_URL` / `POSTGRES_URL` is set
+ * (deployed / configured sandbox), otherwise a local embedded **PGLite**
+ * (Postgres compiled to WASM) so the app has a working database even with
+ * nothing configured — local `vite` included. Swap in Neon later by just
+ * setting `DATABASE_URL`; no code changes. PGLite is local-only: Vercel and
+ * Netlify functions do not bundle its WASM data file.
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
 
@@ -177,6 +178,12 @@ async function createSql(): Promise<Sql> {
         "or a server route loader, never from client code.",
     );
   }
+  if (!databaseUrl && serverlessHost) {
+    throw new Error(
+      "DATABASE_URL (or POSTGRES_URL) is required on Vercel/Netlify. " +
+        "Enable it for Preview and Production — PGLite is local-only.",
+    );
+  }
   return dbSource === "neon" ? createNeonSql() : createPgliteSql();
 }
 
@@ -222,6 +229,7 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  */
 export function ensureDbReady(): Promise<void> {
   if (dbSource !== "pglite") return Promise.resolve();
+  if (serverlessHost) return Promise.resolve();
   return getSql().then(() => undefined);
 }
 
@@ -230,7 +238,7 @@ export function ensureDbReady(): Promise<void> {
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };
-if (typeof window === "undefined" && dbSource === "pglite") {
+if (typeof window === "undefined" && dbSource === "pglite" && !serverlessHost) {
   globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
     globalBoot.__pgBootstrapPromise__ = undefined;
     console.error("[db] PGLite bootstrap failed:", err);
