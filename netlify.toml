@@ -1,0 +1,5 @@
+# Live shop ships on Vercel. This file is only so leftover Netlify Git
+# connections (PR checks) build with the Netlify TanStack plugin instead of
+# the Vercel Nitro preset.
+[build]
+  command = "npm run build"

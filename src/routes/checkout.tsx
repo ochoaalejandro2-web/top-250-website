@@ -5,6 +5,7 @@ import { useCurrentUser, useCurrentUserState } from "@/lib/auth/use-current-user
 import { listProducts, placeOrder, quoteShipping } from "@/lib/shop/server";
 import { useCart } from "@/lib/shop/cart";
 import { money } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +16,15 @@ import type { Carrier } from "@/lib/shop/shipping";
 export const Route = createFileRoute("/checkout")({ component: CheckoutPage });
 
 function CheckoutPage() {
+  const { t } = useI18n();
   const { user, isPending } = useCurrentUserState();
-  if (isPending) return <main className="mx-auto max-w-3xl px-4 py-16 text-muted-foreground">Loading…</main>;
+  if (isPending) return <main className="mx-auto max-w-3xl px-4 py-16 text-muted-foreground">{t("common.loading")}</main>;
   if (!user) return <Navigate to="/login" search={{ as: "customer", next: "/checkout" }} />;
   return <CheckoutForm />;
 }
 
 function CheckoutForm() {
+  const { t } = useI18n();
   const user = useCurrentUser();
   const nav = useNavigate();
   const lines = useCart((s) => s.lines);
@@ -82,7 +85,7 @@ function CheckoutForm() {
         },
       });
       clear();
-      toast.success(`Order #${res.orderId} placed`);
+      toast.success(t("toast.order", { id: res.orderId }));
       await nav({ to: "/account" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not place order");
@@ -94,9 +97,9 @@ function CheckoutForm() {
   if (empty) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
-        Cart is empty.{" "}
+        {t("checkout.empty")}{" "}
         <Link to="/" className="text-primary">
-          Shop
+          {t("checkout.shop")}
         </Link>
       </main>
     );
@@ -105,25 +108,25 @@ function CheckoutForm() {
   return (
     <main className="mx-auto grid max-w-5xl gap-8 px-4 py-10 lg:grid-cols-2">
       <form className="space-y-4" onSubmit={submit}>
-        <h1 className="text-3xl">Checkout</h1>
+        <h1 className="text-3xl">{t("checkout.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Ships from Phoenix via USPS or UPS.{" "}
+          {t("checkout.lead")}{" "}
           <Link to="/contact" className="text-primary">
-            Questions first? Contact us
+            {t("checkout.questions")}
           </Link>
           .
         </p>
-        <Field label="Full name" value={name} onChange={setName} />
-        <Field label="Email" type="email" value={email} onChange={setEmail} />
-        <Field label="Phone" value={phone} onChange={setPhone} />
-        <Field label="Street address" value={address} onChange={setAddress} />
+        <Field label={t("checkout.fullName")} value={name} onChange={setName} />
+        <Field label={t("checkout.email")} type="email" value={email} onChange={setEmail} />
+        <Field label={t("checkout.phone")} value={phone} onChange={setPhone} optional />
+        <Field label={t("checkout.address")} value={address} onChange={setAddress} />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="City" value={city} onChange={setCity} />
-          <Field label="State" value={state} onChange={setState} />
+          <Field label={t("checkout.city")} value={city} onChange={setCity} />
+          <Field label={t("checkout.state")} value={state} onChange={setState} />
         </div>
-        <Field label="ZIP" value={zip} onChange={setZip} />
+        <Field label={t("checkout.zip")} value={zip} onChange={setZip} />
         <div className="space-y-1">
-          <Label>Carrier</Label>
+          <Label>{t("checkout.carrier")}</Label>
           <div className="grid grid-cols-2 gap-2">
             {(["USPS", "UPS"] as const).map((c) => (
               <button
@@ -131,27 +134,27 @@ function CheckoutForm() {
                 type="button"
                 onClick={() => setMethod(c)}
                 className={`rounded-xl border px-3 py-3 text-left text-sm ${
-                  method === c ? "border-primary bg-primary/10" : "border-border bg-card"
+                  method === c ? "border-primary bg-primary/10 neon-glow" : "border-white/15 bg-black"
                 }`}
               >
                 <strong>{c}</strong>
                 <p className="text-muted-foreground">
-                  {quote.data ? money(quote.data[c]) : zip.length >= 5 ? "…" : "Enter ZIP"}
+                  {quote.data ? money(quote.data[c]) : zip.length >= 5 ? "…" : t("checkout.enterZip")}
                 </p>
               </button>
             ))}
           </div>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="notes">Notes</Label>
+          <Label htmlFor="notes">{t("checkout.notes")}</Label>
           <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <Button type="submit" className="w-full" disabled={!canSubmit || busy}>
-          Place order · {money(total)}
+          {t("checkout.place", { total: money(total) })}
         </Button>
       </form>
-      <aside className="rounded-2xl border border-border bg-card p-5 h-fit">
-        <h2 className="text-lg">Order</h2>
+      <aside className="h-fit neon-panel rounded-2xl p-5">
+        <h2 className="text-lg">{t("checkout.order")}</h2>
         <ul className="mt-4 space-y-3 text-sm">
           {rows.map((r) => (
             <li key={r.productId} className="flex justify-between gap-3">
@@ -162,9 +165,9 @@ function CheckoutForm() {
             </li>
           ))}
         </ul>
-        <div className="mt-4 space-y-1 border-t border-border pt-4 text-sm">
+        <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-sm">
           <div className="flex justify-between">
-            <span>Subtotal</span>
+            <span>{t("checkout.subtotal")}</span>
             <span>{money(subtotal)}</span>
           </div>
           <div className="flex justify-between">
@@ -172,8 +175,8 @@ function CheckoutForm() {
             <span>{quote.data ? money(ship) : "—"}</span>
           </div>
           <div className="flex justify-between text-base font-medium">
-            <span>Total</span>
-            <span>{money(total)}</span>
+            <span>{t("checkout.total")}</span>
+            <span className="neon-text">{money(total)}</span>
           </div>
         </div>
       </aside>
@@ -186,17 +189,19 @@ function Field({
   value,
   onChange,
   type = "text",
+  optional,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  optional?: boolean;
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-");
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} required={label !== "Phone"} />
+      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} required={!optional} />
     </div>
   );
 }

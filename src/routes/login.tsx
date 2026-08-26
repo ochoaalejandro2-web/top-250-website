@@ -4,6 +4,7 @@ import { Shield, User } from "lucide-react";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { becomeStoreAdmin } from "@/lib/shop/server";
 import { BRAND } from "@/lib/shop/brand";
+import { useI18n } from "@/lib/i18n/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
+  const { t } = useI18n();
   const { as: initialRole, next } = Route.useSearch();
   const [role, setRole] = useState<Role>(initialRole);
   const [mode, setMode] = useState<"in" | "up">("up");
@@ -73,13 +75,11 @@ function Login() {
 
   return (
     <main className="mx-auto grid min-h-[80vh] max-w-lg place-items-center px-4 py-12">
-      <Card className="w-full p-6">
+      <Card className="w-full neon-panel p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{BRAND}</p>
-        <h1 className="mt-2 text-2xl">{role === "admin" ? "Administrator login" : "Customer login"}</h1>
+        <h1 className="mt-2 text-2xl">{role === "admin" ? t("login.adminTitle") : t("login.customerTitle")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {role === "admin"
-            ? "Manage products and orders. The first admin account owns the store. Later, use the store access code."
-            : "Create a profile with any email so you can checkout and see your orders."}
+          {role === "admin" ? t("login.adminLead") : t("login.customerLead")}
         </p>
 
         <div className="mt-5 grid grid-cols-2 gap-2">
@@ -87,21 +87,21 @@ function Login() {
             type="button"
             onClick={() => setRole("customer")}
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm ${
-              role === "customer" ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"
+              role === "customer" ? "border-primary bg-primary/10 text-foreground" : "border-white/15 text-muted-foreground"
             }`}
           >
             <User className="size-4" />
-            Customer
+            {t("login.customer")}
           </button>
           <button
             type="button"
             onClick={() => setRole("admin")}
             className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm ${
-              role === "admin" ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"
+              role === "admin" ? "border-destructive bg-destructive/10 text-foreground" : "border-white/15 text-muted-foreground"
             }`}
           >
             <Shield className="size-4" />
-            Administrator
+            {t("login.admin")}
           </button>
         </div>
 
@@ -115,19 +115,19 @@ function Login() {
                 className="w-full"
                 onClick={() => signIn(p.providerId, { callbackURL: dest })}
               >
-                Continue with {p.label}
+                {t("login.continueWith", { provider: p.label })}
               </Button>
             ))}
-            <div className="relative py-2 text-center text-xs text-muted-foreground">or email</div>
+            <div className="relative py-2 text-center text-xs text-muted-foreground">{t("login.orEmail")}</div>
             <form className="space-y-3" onSubmit={onEmail}>
               {mode === "up" && (
                 <div className="space-y-1">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">{t("login.name")}</Label>
                   <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
               )}
               <div className="space-y-1">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("login.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -138,7 +138,7 @@ function Login() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("login.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -151,7 +151,7 @@ function Login() {
               </div>
               {role === "admin" && (
                 <div className="space-y-1">
-                  <Label htmlFor="admin-code">Store access code (if the shop already has an owner)</Label>
+                  <Label htmlFor="admin-code">{t("login.code")}</Label>
                   <Input
                     id="admin-code"
                     value={adminCode}
@@ -164,11 +164,11 @@ function Login() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {mode === "up"
                   ? role === "admin"
-                    ? "Create admin account"
-                    : "Create customer account"
+                    ? t("login.createAdmin")
+                    : t("login.createCustomer")
                   : role === "admin"
-                    ? "Sign in as admin"
-                    : "Sign in as customer"}
+                    ? t("login.signAdmin")
+                    : t("login.signCustomer")}
               </Button>
             </form>
             <button
@@ -176,15 +176,15 @@ function Login() {
               className="w-full text-sm text-muted-foreground underline"
               onClick={() => setMode(mode === "up" ? "in" : "up")}
             >
-              {mode === "up" ? "Already have an account? Sign in" : "New here? Create an account"}
+              {mode === "up" ? t("login.haveAccount") : t("login.newHere")}
             </button>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-muted-foreground">Sign-in is disabled.</p>
+          <p className="mt-4 text-sm text-muted-foreground">{t("login.disabled")}</p>
         )}
         <p className="mt-6 text-center text-sm">
           <Link to="/" className="text-muted-foreground hover:text-foreground">
-            Back to shop
+            {t("login.back")}
           </Link>
         </p>
       </Card>

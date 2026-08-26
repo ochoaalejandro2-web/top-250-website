@@ -1,19 +1,28 @@
 import { useState } from "react";
 import { submitContact } from "@/lib/shop/server";
 import { openShopChat } from "@/lib/shop/brand";
+import { useI18n } from "@/lib/i18n/locale";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-const TOPICS = ["Product question", "Shipping (USPS / UPS)", "Before I buy", "Order help", "Other"];
+const TOPICS: { value: string; key: MessageKey }[] = [
+  { value: "Product question", key: "form.topic.product" },
+  { value: "Shipping (USPS / UPS)", key: "form.topic.shipping" },
+  { value: "Before I buy", key: "form.topic.before" },
+  { value: "Order help", key: "form.topic.order" },
+  { value: "Other", key: "form.topic.other" },
+];
 
 export function ContactForm() {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [topic, setTopic] = useState(TOPICS[2]);
+  const [topic, setTopic] = useState(TOPICS[2].value);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -24,7 +33,7 @@ export function ContactForm() {
     try {
       await submitContact({ data: { name, email, phone, topic, message } });
       setSent(true);
-      toast.success("Message sent. We’ll reply by email.");
+      toast.success(t("toast.message"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not send");
     } finally {
@@ -34,54 +43,53 @@ export function ContactForm() {
 
   if (sent) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="text-lg">Got it</h3>
+      <div className="neon-panel rounded-2xl p-6">
+        <h3 className="text-lg">{t("form.sentTitle")}</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Thanks {name.split(" ")[0] || ""}. We read every note before packing orders. For a faster answer,
-          chat with the shop assistant.
+          {t("form.sentBody", { name: name.split(" ")[0] || "" })}
         </p>
         <Button className="mt-4" type="button" onClick={() => openShopChat()}>
-          Open the assistant
+          {t("form.openAssistant")}
         </Button>
       </div>
     );
   }
 
   return (
-    <form className="space-y-3 rounded-2xl border border-border bg-card p-5" onSubmit={onSubmit}>
+    <form className="space-y-3 neon-panel rounded-2xl p-5" onSubmit={onSubmit}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Your name" value={name} onChange={setName} required />
-        <Field label="Email" type="email" value={email} onChange={setEmail} required />
+        <Field label={t("form.name")} value={name} onChange={setName} required />
+        <Field label={t("form.email")} type="email" value={email} onChange={setEmail} required />
       </div>
-      <Field label="Phone (optional)" value={phone} onChange={setPhone} />
+      <Field label={t("form.phone")} value={phone} onChange={setPhone} />
       <div className="space-y-1">
-        <Label htmlFor="topic">Topic</Label>
+        <Label htmlFor="topic">{t("form.topic")}</Label>
         <select
           id="topic"
-          className="flex h-11 w-full rounded-lg border border-border bg-card px-3 text-sm"
+          className="flex h-11 w-full rounded-lg border border-white/15 bg-black px-3 text-sm"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
         >
-          {TOPICS.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          {TOPICS.map((item) => (
+            <option key={item.value} value={item.value}>
+              {t(item.key)}
             </option>
           ))}
         </select>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="message">Message</Label>
+        <Label htmlFor="message">{t("form.message")}</Label>
         <Textarea
           id="message"
           required
           minLength={8}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask about a product, size, or shipping to your ZIP…"
+          placeholder={t("form.messagePh")}
         />
       </div>
       <Button type="submit" className="w-full" disabled={busy}>
-        {busy ? "Sending…" : "Send message"}
+        {busy ? t("form.sending") : t("form.send")}
       </Button>
     </form>
   );
@@ -104,7 +112,11 @@ function Field({
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} required={required} />
+      <Input id={id} type={type} value={value} onChange={(e) => setOn(e, onChange)} required={required} />
     </div>
   );
+}
+
+function setOn(e: React.ChangeEvent<HTMLInputElement>, onChange: (v: string) => void) {
+  onChange(e.target.value);
 }
