@@ -49,7 +49,28 @@ const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
+  __neonMigrateChain__?: Promise<void>;
 };
+
+const MIGRATIONS_TABLE = `
+  create table if not exists _migrations (
+    name text primary key,
+    applied_at timestamptz not null default now()
+  )`;
+
+/** SQL files under /migrations/*.sql, inlined by Vite (no runtime fs). */
+function globbedMigrationFiles(): { name: string; path: string; sql: string }[] {
+  const migrations = import.meta.glob("/migrations/*.sql", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>;
+  return Object.entries(migrations).map(([path, sql]) => ({
+    name: path.split("/").pop() ?? path,
+    path,
+    sql,
+  }));
+}
 
 /**
  * Result-type parity: Postgres sends every value as text plus a type OID — the
@@ -86,6 +107,49 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
+async function applyNeonMigrations(
+  pool: import("pg").Pool,
+): Promise<void> {
+  // `npm run build` is `vite build` and does not run migrate.mjs, so production
+  // Neon never received `product_photos` / later shop files unless we apply them
+  // here on first query. Seed inserts use ON CONFLICT DO NOTHING so admin edits
+  // are not overwritten.
+  const client = await pool.connect();
+  try {
+    await client.query(MIGRATIONS_TABLE);
+    const done = (await client.query("select name from _migrations")).rows.map(
+      (r: { name: string }) => r.name,
+    );
+    const files = globbedMigrationFiles();
+    const byName = new Map(files.map((f) => [f.name, f]));
+    for (const { name } of pendingMigrations(
+      files.map((f) => f.path),
+      done,
+    )) {
+      const file = byName.get(name);
+      if (!file) continue;
+      try {
+        await client.query("BEGIN");
+        // Simple-query protocol (no params) so a whole multi-statement file runs.
+        await client.query(file.sql);
+        await client.query("insert into _migrations (name) values ($1)", [name]);
+        await client.query("COMMIT");
+      } catch (err) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          /* connection died — keep the original error */
+        }
+        const code = (err as { code?: string }).code;
+        if (code === "23505") continue; // another isolate already recorded it
+        throw err;
+      }
+    }
+  } finally {
+    client.release();
+  }
+}
+
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
@@ -94,7 +158,18 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      // Serverless: don't hold a pile of idle clients against Neon's limit.
+      max: serverlessHost ? 1 : 10,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 15_000,
+    });
+    const migrate = (globalRef.__neonMigrateChain__ ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(() => applyNeonMigrations(pool));
+    globalRef.__neonMigrateChain__ = migrate;
+    await migrate;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
@@ -120,9 +195,7 @@ async function createPgliteSql(): Promise<Sql> {
       },
     });
     await pg.waitReady;
-    await pg.exec(
-      "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
-    );
+    await pg.exec(MIGRATIONS_TABLE);
     return pg;
   })().catch((err) => {
     globalRef.__pgliteInstance__ = undefined;
@@ -138,21 +211,23 @@ async function createPgliteSql(): Promise<Sql> {
   // passes serialized on a global chain so concurrent callers never
   // double-apply.
   const migrate = async (): Promise<void> => {
-    const migrations = import.meta.glob("/migrations/*.sql", {
-      query: "?raw",
-      import: "default",
-      eager: true,
-    }) as Record<string, string>;
+    const files = globbedMigrationFiles();
+    const byPath = new Map(files.map((f) => [f.path, f]));
     const doneRows = await pg.query<{ name: string }>(
       "select name from _migrations",
     );
     const done = doneRows.rows.map((r) => r.name);
-    for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) {
+    for (const { name, path } of pendingMigrations(
+      files.map((f) => f.path),
+      done,
+    )) {
+      const file = byPath.get(path);
+      if (!file) continue;
       // Apply + record atomically (parity with scripts/migrate.mjs) so a failed
       // statement can't leave a file half-applied but untracked. New files such as
       // 0003_contact_and_brand.sql are picked up on HMR of this module.
       await pg.transaction(async (tx) => {
-        await tx.exec(migrations[path]);
+        await tx.exec(file.sql);
         await tx.query("insert into _migrations (name) values ($1)", [name]);
       });
     }
@@ -222,7 +297,8 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  *
  * - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
  *   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
- * - **Neon**: no-op (pool is created lazily on first query).
+ * - **Neon**: pool + pending `migrations/*.sql` run lazily on first `getSql()`
+ *   (Vercel `vite build` does not run migrate.mjs).
  *
  * Vite `configureServer` awaits this at dev startup; production imports of this
  * module kick it off immediately (see bottom of file).

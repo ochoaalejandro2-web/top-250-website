@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { isBlockedCatalogItem, slugFromName } from "./catalog";
+import { isBlockedCatalogItem } from "./catalog";
+import { assertWritableCatalogItem, normalizeProductWrite, productPhotoPublicUrl } from "./persist";
 import { estimateShippingCents, type Carrier } from "./shipping";
 
 export type Product = {
@@ -90,13 +91,13 @@ function publicProduct(p: Product) {
   return p.active && !isBlockedCatalogItem(p);
 }
 
-export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
+export const listProducts = createServerFn({ method: "POST" }).handler(async () => {
   const sql = await getSql();
   const rows = await sql<ProductRow>`select * from products where active = true order by sort_order, name`;
   return rows.map(mapProduct).filter(publicProduct);
 });
 
-export const getProduct = createServerFn({ method: "GET" })
+export const getProduct = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     const sql = await getSql();
@@ -335,28 +336,19 @@ export const saveProduct = createServerFn({ method: "POST" })
       imageUrl: string;
       stock: number;
       active: boolean;
+      sortOrder?: number;
     }) => input,
   )
   .handler(async ({ context, data }) => {
     await requireAdmin(context.userId);
-    const id = (data.id.trim() || slugFromName(data.name)).toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (!id) throw new Error("Product id required");
-    const blocked = isBlockedCatalogItem({
-      id,
-      name: data.name,
-      fullName: data.fullName,
-      description: data.description,
-      tag: data.tag,
-    });
-    if (blocked) {
-      throw new Error("This shop only lists gaming accessories — DMA / firmware hardware is not allowed.");
-    }
+    const row = normalizeProductWrite(data);
+    assertWritableCatalogItem(row);
     const sql = await getSql();
-    await sql`
-      insert into products (id, name, full_name, tag, description, price_cents, weight_lb, image_url, stock, active)
+    const saved = await sql<ProductRow>`
+      insert into products (id, name, full_name, tag, description, price_cents, weight_lb, image_url, stock, active, sort_order)
       values (
-        ${id}, ${data.name.trim()}, ${data.fullName.trim() || data.name.trim()}, ${data.tag.trim()}, ${data.description.trim()},
-        ${Math.round(data.priceCents)}, ${data.weightLb}, ${data.imageUrl.trim()}, ${Math.round(data.stock)}, ${data.active}
+        ${row.id}, ${row.name}, ${row.fullName}, ${row.tag}, ${row.description},
+        ${row.priceCents}, ${row.weightLb}, ${row.imageUrl}, ${row.stock}, ${row.active}, ${row.sortOrder}
       )
       on conflict (id) do update set
         name = excluded.name,
@@ -367,8 +359,11 @@ export const saveProduct = createServerFn({ method: "POST" })
         weight_lb = excluded.weight_lb,
         image_url = excluded.image_url,
         stock = excluded.stock,
-        active = excluded.active`;
-    return { ok: true, id };
+        active = excluded.active
+      returning *`;
+    const product = saved[0] ? mapProduct(saved[0]) : null;
+    if (!product) throw new Error("Product did not save to the database");
+    return { ok: true as const, id: product.id, product };
   });
 
 export const removeProduct = createServerFn({ method: "POST" })
@@ -383,33 +378,50 @@ export const removeProduct = createServerFn({ method: "POST" })
 
 export const uploadProductPhoto = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { filename: string; contentType: string; dataBase64: string }) => input)
+  .validator((input: { filename: string; contentType: string; dataBase64: string; productId?: string }) => input)
   .handler(async ({ context, data }) => {
     await requireAdmin(context.userId);
     const mime = data.contentType.trim().toLowerCase();
     if (!mime.startsWith("image/")) throw new Error("Please upload an image file");
     const bytes = Buffer.from(data.dataBase64, "base64");
     if (!bytes.length) throw new Error("Empty file");
-    if (bytes.length > 6_000_000) throw new Error("Image is too large (max 6 MB)");
-
-    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-    if (token) {
-      const { put } = await import("@vercel/blob");
-      const safe = (data.filename || "photo").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
-      const blob = await put(`products/${Date.now()}-${safe}`, bytes, {
-        access: "public",
-        token,
-        contentType: mime,
-        addRandomSuffix: true,
-      });
-      return { url: blob.url, storage: "vercel-blob" as const };
-    }
+    if (bytes.length > 4_500_000) throw new Error("Image is too large (max 4.5 MB)");
 
     const sql = await getSql();
     const id = crypto.randomUUID();
+    // Always persist bytes in Postgres so a missing Blob token (or a new deploy)
+    // cannot drop the photo. Vercel Blob is an optional CDN in front of that.
     await sql`insert into product_photos (id, mime, data_base64)
       values (${id}, ${mime}, ${data.dataBase64})`;
-    return { url: `/api/product-image/${id}`, storage: "postgres" as const };
+
+    let blobUrl: string | undefined;
+    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+    if (token) {
+      try {
+        const { put } = await import("@vercel/blob");
+        const safe = (data.filename || "photo").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
+        const blob = await put(`products/${Date.now()}-${safe}`, bytes, {
+          access: "public",
+          token,
+          contentType: mime,
+          addRandomSuffix: true,
+        });
+        blobUrl = blob.url;
+      } catch {
+        blobUrl = undefined;
+      }
+    }
+
+    const url = productPhotoPublicUrl({ blobUrl, photoId: id });
+    const productId = data.productId?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (productId) {
+      await sql`update products set image_url = ${url} where id = ${productId}`;
+    }
+    return {
+      url,
+      storage: blobUrl ? ("vercel-blob" as const) : ("postgres" as const),
+      id,
+    };
   });
 
 export const askShopAi = createServerFn({ method: "POST" })

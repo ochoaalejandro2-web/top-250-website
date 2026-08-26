@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteHeader } from "@/components/site-header";
@@ -9,8 +10,6 @@ import { I18nProvider } from "@/lib/i18n/locale";
 import { Toaster } from "sonner";
 import { BRAND } from "@/lib/shop/brand";
 import appCss from "../styles.css?url";
-
-const queryClient = new QueryClient();
 
 export const Route = createRootRoute({
   head: () => ({
@@ -48,6 +47,14 @@ export const Route = createRootRoute({
 });
 
 function Root() {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { staleTime: 0, refetchOnWindowFocus: true, retry: 1 },
+        },
+      }),
+  );
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

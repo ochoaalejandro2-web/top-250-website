@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { ArrowRight, House, Package } from "lucide-react";
 import { listProducts } from "@/lib/shop/server";
@@ -13,11 +14,21 @@ import { ContactForm } from "@/components/contact-form";
 
 export const Route = createFileRoute("/")({
   loader: async () => ({ products: await listProducts() }),
+  staleTime: 0,
+  shouldReload: true,
   component: Home,
 });
 
 function Home() {
-  const { products } = Route.useLoaderData();
+  const initial = Route.useLoaderData();
+  const listing = useQuery({
+    queryKey: ["products"],
+    queryFn: () => listProducts(),
+    initialData: initial.products,
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
+  const products = listing.data ?? initial.products;
   const { t } = useI18n();
   const count = products.length;
   const preview = products.slice(0, 4);
