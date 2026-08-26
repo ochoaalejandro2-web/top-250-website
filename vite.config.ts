@@ -5,14 +5,13 @@ import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import netlify from "@netlify/vite-plugin-tanstack-start";
+import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
-/** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
   try {
     return readdirSync(join(root, "migrations")).some(isMigrationFile);
@@ -21,9 +20,6 @@ function hasGlobbedMigrations(root: string): boolean {
   }
 }
 
-/**
- * Finish PGLite bootstrap during dev-server setup (before traffic).
- */
 function pgliteBootstrapPlugin(): Plugin {
   return {
     name: "app-builder:pglite-bootstrap",
@@ -45,9 +41,6 @@ function pgliteBootstrapPlugin(): Plugin {
   };
 }
 
-/**
- * Live-preview OAuth popup
- */
 function authPopupPlugin(): Plugin {
   return {
     name: "app-builder:auth-popup",
@@ -119,7 +112,7 @@ function authPopupPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command, isPreview }) => ({
   server: {
     host: "0.0.0.0",
     port: 8080,
@@ -138,7 +131,14 @@ export default defineConfig({
     grokPwaPlugin(),
     tailwindcss(),
     tanstackStart(),
-    netlify(),          // ← Netlify plugin (replaces nitro)
+    ...(command === "build" || isPreview
+      ? [
+          nitro({
+            preset: "vercel",
+            serverDir: "./server",
+          }),
+        ]
+      : []),
     viteReact(),
   ],
-});
+}));
