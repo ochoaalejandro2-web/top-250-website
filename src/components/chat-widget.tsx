@@ -1,23 +1,24 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { askShopAi } from "@/lib/shop/server";
-import { BRAND, OPEN_CHAT_EVENT } from "@/lib/shop/brand";
+import { OPEN_CHAT_EVENT } from "@/lib/shop/brand";
+import { useI18n } from "@/lib/i18n/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 export function ChatWidget() {
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      content: `Hi — I’m the ${BRAND} assistant. Ask about any product, price, or USPS / UPS shipping from Phoenix.`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([]);
+
+  useEffect(() => {
+    setMessages([{ role: "assistant", content: t("chat.hello") }]);
+  }, [locale, t]);
 
   useEffect(() => {
     const onOpen = () => {
@@ -44,7 +45,7 @@ export function ChatWidget() {
       });
       setMessages([...next, { role: "assistant", content: res.ok ? res.text : res.error }]);
     } catch {
-      setMessages([...next, { role: "assistant", content: "Could not reach the assistant." }]);
+      setMessages([...next, { role: "assistant", content: t("chat.fail") }]);
     } finally {
       setBusy(false);
     }
@@ -53,11 +54,11 @@ export function ChatWidget() {
   return (
     <div className="fixed bottom-20 right-4 z-40 sm:bottom-6">
       {open ? (
-        <div className="flex h-[min(520px,72vh)] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-          <div className="flex items-center justify-between border-b border-border bg-muted px-4 py-3">
+        <div className="flex h-[min(520px,72vh)] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl neon-panel bg-black shadow-2xl">
+          <div className="flex items-center justify-between border-b border-white/10 bg-black px-4 py-3">
             <div>
-              <p className="text-sm font-medium">{BRAND} assistant</p>
-              <p className="text-xs text-muted-foreground">Products, prices, USPS & UPS</p>
+              <p className="text-sm font-medium">{t("chat.title")}</p>
+              <p className="text-xs text-muted-foreground">{t("chat.sub")}</p>
             </div>
             <button type="button" className="p-1 text-muted-foreground" onClick={() => setOpen(false)}>
               <X className="size-4" />
@@ -70,16 +71,16 @@ export function ChatWidget() {
                 className={
                   m.role === "user"
                     ? "ml-8 rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-primary-foreground"
-                    : "mr-8 rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-foreground"
+                    : "mr-8 rounded-2xl rounded-bl-sm bg-white/5 px-3 py-2 text-foreground"
                 }
               >
                 {m.content}
               </div>
             ))}
-            {busy && <p className="text-xs text-muted-foreground">Thinking…</p>}
+            {busy && <p className="text-xs text-muted-foreground">{t("chat.thinking")}</p>}
           </div>
           <form
-            className="flex gap-2 border-t border-border p-3"
+            className="flex gap-2 border-t border-white/10 p-3"
             onSubmit={(e) => {
               e.preventDefault();
               void send();
@@ -88,8 +89,8 @@ export function ChatWidget() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Shipping to 85001?"
-              aria-label="Ask the shop"
+              placeholder={t("chat.placeholder")}
+              aria-label={t("nav.help")}
             />
             <Button type="submit" size="icon" disabled={busy}>
               <Send className="size-4" />
@@ -99,20 +100,16 @@ export function ChatWidget() {
       ) : (
         <div className="flex flex-col items-end gap-2">
           {hint && (
-            <div className="max-w-56 rounded-2xl rounded-br-sm border border-border bg-card px-3 py-2 text-sm shadow-lg">
-              Questions before you buy? Chat about gear or shipping.
-              <button
-                type="button"
-                className="mt-1 block text-xs text-muted-foreground"
-                onClick={() => setHint(false)}
-              >
-                Dismiss
+            <div className="max-w-56 rounded-2xl rounded-br-sm neon-panel px-3 py-2 text-sm">
+              {t("chat.hint")}
+              <button type="button" className="mt-1 block text-xs text-muted-foreground" onClick={() => setHint(false)}>
+                {t("chat.dismiss")}
               </button>
             </div>
           )}
           <Button size="lg" onClick={() => setOpen(true)} className="shadow-lg">
             <MessageCircle className="size-4" />
-            Chat with us
+            {t("chat.open")}
           </Button>
         </div>
       )}

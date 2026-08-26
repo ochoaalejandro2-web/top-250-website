@@ -1,14 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import { MessageCircle, ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useCart } from "@/lib/shop/cart";
-import { BRAND, openShopChat } from "@/lib/shop/brand";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/lib/shop/server";
-import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n/locale";
+import { BrandLogo } from "@/components/brand-logo";
+import { LanguageToggle } from "@/components/language-toggle";
 
 export function SiteHeader() {
+  const { t } = useI18n();
   const { user } = useCurrentUserState();
   const count = useCart((s) => s.lines.reduce((n, l) => n + l.qty, 0));
   const me = useQuery({
@@ -19,64 +21,52 @@ export function SiteHeader() {
   const isAdmin = Boolean(me.data?.is_admin);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-md border border-primary/40 bg-card font-display text-xs tracking-wide text-primary">
-            250
-          </span>
-          <span className="font-display text-lg tracking-wide">{BRAND}</span>
-        </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-1 text-sm">
-          <Link to="/" className="px-2 py-2 text-muted-foreground hover:text-foreground">
-            Shop
+        <BrandLogo />
+        <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm font-medium">
+          <Link to="/" className="text-white/85 hover:text-white">
+            {t("nav.shop")}
           </Link>
-          <Link to="/contact" className="px-2 py-2 text-muted-foreground hover:text-foreground">
-            Contact
+          <Link to="/shipping" className="text-white/85 hover:text-white">
+            {t("nav.shipping")}
           </Link>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 px-2 py-2 text-muted-foreground hover:text-foreground"
-            onClick={() => openShopChat()}
-          >
-            <MessageCircle className="size-4" />
-            Help
-          </button>
-          <Link to="/cart" className="relative px-2 py-2 text-muted-foreground hover:text-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <ShoppingBag className="size-4" />
-              <span className="hidden sm:inline">Cart</span>
-            </span>
+          <Link to="/contact" className="text-white/85 hover:text-white">
+            {t("nav.contact")}
+          </Link>
+          {isAdmin ? (
+            <Link to="/admin" className="font-semibold text-destructive">
+              {t("nav.admin")}
+            </Link>
+          ) : (
+            <Link
+              to="/login"
+              search={{ as: "admin", next: "/admin" }}
+              className="font-semibold text-destructive"
+            >
+              {t("nav.admin")}
+            </Link>
+          )}
+          <LanguageToggle />
+          <Link to="/cart" className="relative text-white/85 hover:text-white" aria-label={t("nav.cart")}>
+            <ShoppingBag className="size-4" />
             {count > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground">
+              <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-black">
                 {count}
               </span>
             )}
           </Link>
           {user ? (
             <>
-              <Link to="/account" className="px-2 py-2 text-muted-foreground hover:text-foreground">
-                My orders
+              <Link to="/account" className="hidden text-white/85 hover:text-white sm:inline">
+                {t("nav.orders")}
               </Link>
               <UserButton />
             </>
           ) : (
-            <Button asChild size="sm">
-              <Link to="/login" search={{ as: "customer" }}>
-                Customer login
-              </Link>
-            </Button>
-          )}
-          {isAdmin ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to="/admin">Admin</Link>
-            </Button>
-          ) : (
-            <Button asChild size="sm" variant="outline">
-              <Link to="/login" search={{ as: "admin", next: "/admin" }}>
-                Admin login
-              </Link>
-            </Button>
+            <Link to="/login" search={{ as: "customer" }} className="text-white/85 hover:text-white">
+              {t("nav.login")}
+            </Link>
           )}
         </nav>
       </div>

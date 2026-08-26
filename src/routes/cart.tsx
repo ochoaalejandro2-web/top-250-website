@@ -4,12 +4,16 @@ import { listProducts } from "@/lib/shop/server";
 import { useCart } from "@/lib/shop/cart";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { money } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ProductArt } from "@/components/product-art";
+import { isCustomProductPhoto } from "@/lib/shop/catalog";
 
 export const Route = createFileRoute("/cart")({ component: CartPage });
 
 function CartPage() {
+  const { t } = useI18n();
   const { user } = useCurrentUserState();
   const lines = useCart((s) => s.lines);
   const setQty = useCart((s) => s.setQty);
@@ -26,22 +30,26 @@ function CartPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-3xl">Cart</h1>
+      <h1 className="text-3xl">{t("cart.title")}</h1>
       {rows.length === 0 ? (
         <p className="mt-6 text-muted-foreground">
-          Empty.{" "}
+          {t("cart.empty")}{" "}
           <Link to="/" className="text-primary">
-            Shop the lineup
+            {t("cart.shop")}
           </Link>
         </p>
       ) : (
         <div className="mt-6 space-y-4">
           {rows.map((r) => (
-            <div key={r.productId} className="flex gap-4 rounded-2xl border border-border bg-card p-3">
-              <img src={r.product.imageUrl} alt="" className="h-20 w-28 rounded-lg object-cover" />
+            <div key={r.productId} className="flex gap-4 neon-panel rounded-2xl p-3">
+              {isCustomProductPhoto(r.product.imageUrl) ? (
+                <img src={r.product.imageUrl} alt="" className="h-20 w-28 rounded-lg object-cover" />
+              ) : (
+                <ProductArt id={r.product.id} name={r.product.name} className="h-20 w-28 rounded-lg" />
+              )}
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{r.product.name}</p>
-                <p className="text-sm text-muted-foreground">{money(r.product.priceCents)}</p>
+                <p className="text-sm text-primary">{money(r.product.priceCents)}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <Input
                     type="number"
@@ -50,32 +58,32 @@ function CartPage() {
                     value={r.qty}
                     onChange={(e) => setQty(r.productId, Number(e.target.value))}
                   />
-                  <button type="button" className="text-sm text-muted-foreground" onClick={() => remove(r.productId)}>
-                    Remove
+                  <button type="button" className="text-sm text-destructive" onClick={() => remove(r.productId)}>
+                    {t("cart.remove")}
                   </button>
                 </div>
               </div>
             </div>
           ))}
-          <div className="flex items-center justify-between border-t border-border pt-4">
-            <span>Subtotal</span>
-            <strong>{money(subtotal)}</strong>
+          <div className="flex items-center justify-between border-t border-white/10 pt-4">
+            <span>{t("cart.subtotal")}</span>
+            <strong className="neon-text">{money(subtotal)}</strong>
           </div>
-          <p className="text-sm text-muted-foreground">USPS / UPS calculated from your ZIP on the next step.</p>
+          <p className="text-sm text-muted-foreground">{t("cart.shipHint")}</p>
           {user ? (
             <Button asChild className="w-full">
-              <Link to="/checkout">Checkout</Link>
+              <Link to="/checkout">{t("cart.checkout")}</Link>
             </Button>
           ) : (
             <Button asChild className="w-full">
               <Link to="/login" search={{ as: "customer", next: "/checkout" }}>
-                Customer login to checkout
+                {t("cart.loginCheckout")}
               </Link>
             </Button>
           )}
           <p className="text-center text-sm">
             <Link to="/contact" className="text-muted-foreground hover:text-foreground">
-              Questions before you buy? Contact us
+              {t("cart.questions")}
             </Link>
           </p>
         </div>

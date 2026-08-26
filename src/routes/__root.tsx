@@ -5,6 +5,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ChatWidget } from "@/components/chat-widget";
+import { I18nProvider } from "@/lib/i18n/locale";
 import { Toaster } from "sonner";
 import { BRAND } from "@/lib/shop/brand";
 import appCss from "../styles.css?url";
@@ -16,11 +17,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: BRAND },
-      { name: "theme-color", content: "#0a0a0c" },
+      { title: `${BRAND} — Phoenix gaming accessories` },
+      { name: "theme-color", content: "#000000" },
       {
         name: "description",
-        content: `${BRAND} gaming accessories. USPS and UPS from Phoenix. Sign in to order and track.`,
+        content: `${BRAND} gaming accessories from Phoenix. See the price, ask a question, then buy. USPS and UPS from your ZIP.`,
       },
     ],
     links: [
@@ -31,17 +32,15 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
       },
     ],
   }),
   notFoundComponent: () => (
-    <div className="flex min-h-[50vh] items-center justify-center text-center">
+    <div className="flex min-h-[50vh] items-center justify-center px-4 text-center">
       <div>
-        <h1 className="text-2xl font-bold">Page not found</h1>
-        <p className="mt-2 text-muted-foreground">
-          The page you are looking for does not exist.
-        </p>
+        <h1 className="text-2xl font-extrabold">Page not found</h1>
+        <p className="mt-2 text-muted-foreground">The page you are looking for does not exist.</p>
       </div>
     </div>
   ),
@@ -54,15 +53,17 @@ function Root() {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className="neon-scene min-h-screen bg-background text-foreground antialiased">
         <PreviewHostBridge />
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
-            <SiteHeader />
-            <Outlet />
-            <SiteFooter />
-            <ChatWidget />
-            <Toaster theme="dark" position="top-center" />
+            <I18nProvider>
+              <SiteHeader />
+              <Outlet />
+              <SiteFooter />
+              <ChatWidget />
+              <Toaster theme="dark" position="top-center" />
+            </I18nProvider>
           </QueryClientProvider>
         </AuthProvider>
         <Scripts />

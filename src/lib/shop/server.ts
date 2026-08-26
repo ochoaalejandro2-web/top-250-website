@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { isBlockedCatalogItem, slugFromName } from "./catalog";
 import { estimateShippingCents, type Carrier } from "./shipping";
 
 export type Product = {
@@ -85,10 +86,14 @@ async function requireAdmin(userId: string) {
   if (!rows[0]?.is_admin) throw new Error("Admin only");
 }
 
+function publicProduct(p: Product) {
+  return p.active && !isBlockedCatalogItem(p);
+}
+
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
   const sql = await getSql();
   const rows = await sql<ProductRow>`select * from products where active = true order by sort_order, name`;
-  return rows.map(mapProduct);
+  return rows.map(mapProduct).filter(publicProduct);
 });
 
 export const getProduct = createServerFn({ method: "GET" })
@@ -96,7 +101,9 @@ export const getProduct = createServerFn({ method: "GET" })
   .handler(async ({ data: id }) => {
     const sql = await getSql();
     const rows = await sql<ProductRow>`select * from products where id = ${id}`;
-    return rows[0] ? mapProduct(rows[0]) : null;
+    const product = rows[0] ? mapProduct(rows[0]) : null;
+    if (!product || !publicProduct(product)) return null;
+    return product;
   });
 
 export const quoteShipping = createServerFn({ method: "POST" })
@@ -332,13 +339,23 @@ export const saveProduct = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await requireAdmin(context.userId);
-    const id = data.id.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const id = (data.id.trim() || slugFromName(data.name)).toLowerCase().replace(/[^a-z0-9-]/g, "");
     if (!id) throw new Error("Product id required");
+    const blocked = isBlockedCatalogItem({
+      id,
+      name: data.name,
+      fullName: data.fullName,
+      description: data.description,
+      tag: data.tag,
+    });
+    if (blocked) {
+      throw new Error("This shop only lists gaming accessories — DMA / firmware hardware is not allowed.");
+    }
     const sql = await getSql();
     await sql`
       insert into products (id, name, full_name, tag, description, price_cents, weight_lb, image_url, stock, active)
       values (
-        ${id}, ${data.name.trim()}, ${data.fullName.trim()}, ${data.tag.trim()}, ${data.description.trim()},
+        ${id}, ${data.name.trim()}, ${data.fullName.trim() || data.name.trim()}, ${data.tag.trim()}, ${data.description.trim()},
         ${Math.round(data.priceCents)}, ${data.weightLb}, ${data.imageUrl.trim()}, ${Math.round(data.stock)}, ${data.active}
       )
       on conflict (id) do update set
@@ -354,6 +371,47 @@ export const saveProduct = createServerFn({ method: "POST" })
     return { ok: true, id };
   });
 
+export const removeProduct = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    await requireAdmin(context.userId);
+    const sql = await getSql();
+    await sql`update products set active = false where id = ${id}`;
+    return { ok: true };
+  });
+
+export const uploadProductPhoto = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { filename: string; contentType: string; dataBase64: string }) => input)
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context.userId);
+    const mime = data.contentType.trim().toLowerCase();
+    if (!mime.startsWith("image/")) throw new Error("Please upload an image file");
+    const bytes = Buffer.from(data.dataBase64, "base64");
+    if (!bytes.length) throw new Error("Empty file");
+    if (bytes.length > 6_000_000) throw new Error("Image is too large (max 6 MB)");
+
+    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+    if (token) {
+      const { put } = await import("@vercel/blob");
+      const safe = (data.filename || "photo").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80);
+      const blob = await put(`products/${Date.now()}-${safe}`, bytes, {
+        access: "public",
+        token,
+        contentType: mime,
+        addRandomSuffix: true,
+      });
+      return { url: blob.url, storage: "vercel-blob" as const };
+    }
+
+    const sql = await getSql();
+    const id = crypto.randomUUID();
+    await sql`insert into product_photos (id, mime, data_base64)
+      values (${id}, ${mime}, ${data.dataBase64})`;
+    return { url: `/api/product-image/${id}`, storage: "postgres" as const };
+  });
+
 export const askShopAi = createServerFn({ method: "POST" })
   .validator((input: { question: string; history?: { role: "user" | "assistant"; content: string }[] }) => input)
   .handler(async ({ data }) => {
@@ -362,9 +420,11 @@ export const askShopAi = createServerFn({ method: "POST" })
     const sql = await getSql();
     const rows = await sql<ProductRow>`select * from products where active = true order by sort_order`;
     const catalog = rows
+      .map(mapProduct)
+      .filter(publicProduct)
       .map(
         (p) =>
-          `- ${p.full_name} ($${Number(p.price_cents) / 100}): ${p.description} Weight ${p.weight_lb} lb. Stock ${p.stock}.`,
+          `- ${p.fullName} ($${p.priceCents / 100}): ${p.description} Weight ${p.weightLb} lb. Stock ${p.stock}.`,
       )
       .join("\n");
     const history = (data.history ?? []).slice(-6);
@@ -382,10 +442,10 @@ export const askShopAi = createServerFn({ method: "POST" })
             role: "system",
             content: `You are the TOP-250 shop assistant. TOP-250 is a small gaming-accessories shop in Phoenix, Arizona. Shipping is USPS or UPS from Phoenix; estimates use ZIP + package weight (USPS cheaper, UPS faster ground). We do not currently offer FedEx or in-store pickup. Be concise, friendly, and accurate. If you do not know, say so. Never invent discounts or stock that is not listed.
 
-Catalog:
+            Catalog (gaming accessories only — never mention DMA cards, FPGA boards, firmware, or cheat hardware):
 ${catalog}
 
-Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and place the order. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard.`,
+Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and place the order. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard. Reply in the customer's language when they write in Spanish.`,
           },
           ...history.map((m) => ({ role: m.role, content: m.content })),
           { role: "user", content: data.question.slice(0, 800) },
