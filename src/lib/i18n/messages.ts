@@ -45,7 +45,7 @@ export const messages = {
     "contact.kicker": "BEFORE YOU BUY",
     "contact.title": "Ask TOP-250 anything",
     "contact.lead":
-      "Questions about an item, fit, stock, or how much USPS or UPS will cost to your ZIP? Send a note first — no account required. We pack from Phoenix and reply as soon as we can.",
+      "Questions about an item, fit, stock, or how much USPS or UPS will cost to your ZIP? Send a note first — no account required. AO packs from Phoenix and replies as soon as possible.",
     "contact.chat": "Chat now",
     "contact.seeLineup": "See the lineup",
     "contact.bulletShip": "Shipping is USPS (usually cheaper) or UPS Ground (usually faster).",
@@ -171,6 +171,7 @@ export const messages = {
     "admin.hidden": "hidden",
     "admin.stockLabel": "stock {n}",
     "footer.blurb": "Gaming accessories from Phoenix, Arizona. Ships with USPS and UPS.",
+    "footer.copyright": "© {year} TOP-250 · AO",
     "footer.shop": "Shop",
     "footer.all": "All products",
     "footer.cart": "Cart",
@@ -249,7 +250,7 @@ export const messages = {
     "contact.kicker": "ANTES DE COMPRAR",
     "contact.title": "Pregúntale a TOP-250",
     "contact.lead":
-      "¿Dudas de un artículo, talla, stock o cuánto costará USPS o UPS a tu ZIP? Escribe primero — no necesitas cuenta. Empacamos desde Phoenix y respondemos lo antes posible.",
+      "¿Dudas de un artículo, talla, stock o cuánto costará USPS o UPS a tu ZIP? Escribe primero — no necesitas cuenta. AO empaca desde Phoenix y responde lo antes posible.",
     "contact.chat": "Chatear ahora",
     "contact.seeLineup": "Ver el catálogo",
     "contact.bulletShip": "El envío es USPS (casi siempre más barato) o UPS Ground (casi siempre más rápido).",
@@ -375,6 +376,7 @@ export const messages = {
     "admin.hidden": "oculto",
     "admin.stockLabel": "stock {n}",
     "footer.blurb": "Accesorios gamer desde Phoenix, Arizona. Envíos con USPS y UPS.",
+    "footer.copyright": "© {year} TOP-250 · AO",
     "footer.shop": "Tienda",
     "footer.all": "Todos los productos",
     "footer.cart": "Carrito",

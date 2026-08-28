@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { OWNER } from "./brand";
 import { isBlockedCatalogItem } from "./catalog";
 import { assertWritableCatalogItem, normalizeProductWrite, productPhotoPublicUrl } from "./persist";
 import { estimateShippingCents, type Carrier } from "./shipping";
@@ -452,7 +453,7 @@ export const askShopAi = createServerFn({ method: "POST" })
         messages: [
           {
             role: "system",
-            content: `You are the TOP-250 shop assistant. TOP-250 is a small gaming-accessories shop in Phoenix, Arizona. Shipping is USPS or UPS from Phoenix; estimates use ZIP + package weight (USPS cheaper, UPS faster ground). We do not currently offer FedEx or in-store pickup. Be concise, friendly, and accurate. If you do not know, say so. Never invent discounts or stock that is not listed.
+            content: `You are the TOP-250 shop assistant. TOP-250 is a small gaming-accessories shop in Phoenix, Arizona, run by ${OWNER}. If asked who owns or runs the shop, say ${OWNER} or TOP-250 — never a full personal name. Shipping is USPS or UPS from Phoenix; estimates use ZIP + package weight (USPS cheaper, UPS faster ground). We do not currently offer FedEx or in-store pickup. Be concise, friendly, and accurate. If you do not know, say so. Never invent discounts or stock that is not listed.
 
             Catalog (gaming accessories only — never mention DMA cards, FPGA boards, firmware, or cheat hardware):
 ${catalog}

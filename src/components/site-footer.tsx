@@ -11,6 +11,7 @@ export function SiteFooter() {
         <div>
           <BrandLogo />
           <p className="mt-3 text-sm text-muted-foreground">{t("footer.blurb")}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{t("footer.copyright", { year: new Date().getFullYear() })}</p>
         </div>
         <div className="text-sm">
           <p className="font-semibold text-white">{t("footer.shop")}</p>
