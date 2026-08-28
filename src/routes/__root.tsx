@@ -8,7 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { ChatWidget } from "@/components/chat-widget";
 import { I18nProvider } from "@/lib/i18n/locale";
 import { Toaster } from "sonner";
-import { BRAND } from "@/lib/shop/brand";
+import { BRAND, OWNER } from "@/lib/shop/brand";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -18,6 +18,7 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: `${BRAND} — Phoenix gaming accessories` },
       { name: "theme-color", content: "#000000" },
+      { name: "author", content: OWNER },
       {
         name: "description",
         content: `${BRAND} gaming accessories from Phoenix. See the price, ask a question, then buy. USPS and UPS from your ZIP.`,
@@ -59,6 +60,17 @@ function Root() {
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Store",
+              name: BRAND,
+              founder: { "@type": "Person", name: OWNER },
+            }),
+          }}
+        />
       </head>
       <body className="neon-scene min-h-screen bg-background text-foreground antialiased">
         <PreviewHostBridge />
