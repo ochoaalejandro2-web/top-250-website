@@ -58,7 +58,8 @@ const LIVE_LINEUP = [
 describe("catalog shop assistant fallback", () => {
   it("answers the HDMI fuser + PS5 question from catalog facts", () => {
     const text = catalogAssistantReply("Does the HDMI fuser work with PS5?", LIVE_LINEUP);
-    assert.match(text, /HDMI Fuser|TOP-250 FUSER/);
+    assert.match(text, /HDMI Fuser/);
+    assert.match(text, /TOP-250 FUSER/);
     assert.match(text, /\$120\.00/);
     assert.match(text, /24 in stock/);
     assert.match(text, /HDMI/);

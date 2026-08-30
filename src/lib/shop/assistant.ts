@@ -84,7 +84,11 @@ function productBlurb(product: AssistantProduct): string {
   const tag = product.tag.trim() ? ` Tags: ${product.tag}.` : "";
   const desc = product.description.trim();
   const sentence = desc ? (desc.endsWith(".") ? desc : `${desc}.`) : "";
-  return `${product.fullName || product.name} is ${money(product.priceCents)}. ${sentence}${tag} ${product.weightLb} lb. ${stock}.`;
+  const title =
+    product.fullName && product.fullName !== product.name
+      ? `${product.name} (${product.fullName})`
+      : product.fullName || product.name;
+  return `${title} is ${money(product.priceCents)}. ${sentence}${tag} ${product.weightLb} lb. ${stock}.`;
 }
 
 function zipFromQuestion(question: string): string | null {
