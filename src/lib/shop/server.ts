@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { catalogAssistantReply } from "./assistant";
-import { OWNER } from "./brand";
+import { catalogAssistantReply, shopAssistantSystemPrompt } from "./assistant";
 import { isBlockedCatalogItem } from "./catalog";
+import { completeShopLlm } from "./llm";
 import { assertWritableCatalogItem, normalizeProductWrite, productPhotoPublicUrl } from "./persist";
 import { estimateShippingCents, type Carrier } from "./shipping";
 
@@ -433,13 +433,6 @@ export const askShopAi = createServerFn({ method: "POST" })
     const rows = await sql<ProductRow>`select * from products where active = true order by sort_order`;
     const products = rows.map(mapProduct).filter(publicProduct);
     const fallback = catalogAssistantReply(data.question, products);
-
-    // Production currently has no XAI_API_KEY on the top-250-website Vercel
-    // project. Prefer the live xAI reply when the key exists; otherwise answer
-    // from the TOP-250 catalog so chat is never the unavailable string.
-    const apiKey = process.env.XAI_API_KEY?.trim();
-    if (!apiKey) return { ok: true as const, text: fallback };
-
     const catalog = products
       .map(
         (p) =>
@@ -447,34 +440,14 @@ export const askShopAi = createServerFn({ method: "POST" })
       )
       .join("\n");
     const history = (data.history ?? []).slice(-6);
+    const messages = [
+      { role: "system" as const, content: shopAssistantSystemPrompt(catalog) },
+      ...history.map((m) => ({ role: m.role, content: m.content })),
+      { role: "user" as const, content: data.question.slice(0, 800) },
+    ];
+
     try {
-      const res = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "grok-4.5",
-          max_tokens: 350,
-          messages: [
-            {
-              role: "system",
-              content: `You are the TOP-250 shop assistant. TOP-250 is a small gaming-accessories shop in Phoenix, Arizona, run by ${OWNER}. If asked who owns or runs the shop, say ${OWNER} or TOP-250 — never a full personal name. Shipping is USPS or UPS from Phoenix; estimates use ZIP + package weight (USPS cheaper, UPS faster ground). We do not currently offer FedEx or in-store pickup. Be concise, friendly, and accurate. If you do not know, say so. Never invent discounts or stock that is not listed.
-
-            Catalog (gaming accessories only — never mention DMA cards, FPGA boards, firmware, or cheat hardware):
-${catalog}
-
-Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and place the order. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard. Reply in the customer's language when they write in Spanish.`,
-            },
-            ...history.map((m) => ({ role: m.role, content: m.content })),
-            { role: "user", content: data.question.slice(0, 800) },
-          ],
-        }),
-      });
-      if (!res.ok) return { ok: true as const, text: fallback };
-      const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const text = body.choices?.[0]?.message?.content?.trim();
+      const text = await completeShopLlm(messages);
       return { ok: true as const, text: text || fallback };
     } catch {
       return { ok: true as const, text: fallback };

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { catalogAssistantReply, scoreCatalogMatch } from "./assistant.ts";
+import { catalogAssistantReply, scoreCatalogMatch, shopAssistantSystemPrompt } from "./assistant.ts";
 
 const LIVE_LINEUP = [
   {
@@ -84,6 +84,12 @@ describe("catalog shop assistant fallback", () => {
     assert.match(text, /UPS/);
     assert.match(text, /Phoenix/);
     assert.doesNotMatch(text, /unavailable right now/i);
+  });
+
+  it("keeps the LLM system prompt on TOP-250 only", () => {
+    const prompt = shopAssistantSystemPrompt("- HDMI Fuser ($120.00): FUSER");
+    assert.match(prompt, /TOP-250/);
+    assert.doesNotMatch(prompt, /Phoenixwebhost|Stripe/i);
   });
 
   it("lists the live lineup when no SKU matches", () => {

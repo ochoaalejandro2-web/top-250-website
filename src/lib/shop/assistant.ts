@@ -108,9 +108,18 @@ function isCompatibilityQuestion(question: string): boolean {
   );
 }
 
+export function shopAssistantSystemPrompt(catalog: string): string {
+  return `You are the TOP-250 shop assistant. TOP-250 is a small gaming-accessories shop in Phoenix, Arizona, run by ${OWNER}. If asked who owns or runs the shop, say ${OWNER} or TOP-250 — never a full personal name. Shipping is USPS or UPS from Phoenix; estimates use ZIP + package weight (USPS cheaper, UPS faster ground). We do not currently offer FedEx or in-store pickup. Be concise, friendly, and accurate. If you do not know, say so. Never invent discounts or stock that is not listed.
+
+            Catalog (gaming accessories only — never mention DMA cards, FPGA boards, firmware, or cheat hardware):
+${catalog}
+
+Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and place the order. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard. Reply in the customer's language when they write in Spanish.`;
+}
+
 /**
- * Offline TOP-250 shop reply from the live catalog. Used when XAI_API_KEY is
- * missing or the xAI request fails so customers still get a product answer.
+ * Offline TOP-250 shop reply from the live catalog. Last resort when Gateway
+ * OIDC (and optional xAI) cannot answer.
  */
 export function catalogAssistantReply(question: string, products: AssistantProduct[]): string {
   const asked = question.trim();
