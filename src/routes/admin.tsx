@@ -152,13 +152,17 @@ function OrdersPanel() {
             <strong>
               #{o.id} · {o.customerName}
             </strong>
-            <Badge>{o.status}</Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{o.status}</Badge>
+              {o.paidAt ? <Badge className="border-primary/40 text-primary">{t("success.paidBadge")}</Badge> : null}
+            </div>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {o.email} · {o.address}, {o.city}, {o.state} {o.zip}
           </p>
           <p className="text-sm">
             {o.shippingMethod} {money(o.shippingCents)} · {money(o.totalCents)}
+            {o.stripeSessionId ? ` · ${o.stripeSessionId}` : ""}
           </p>
           <ul className="mt-2 text-sm text-muted-foreground">
             {o.items.map((it) => (

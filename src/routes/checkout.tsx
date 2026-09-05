@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser, useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -13,7 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { Carrier } from "@/lib/shop/shipping";
 
-export const Route = createFileRoute("/checkout")({ component: CheckoutPage });
+type CheckoutSearch = { canceled?: boolean };
+
+export const Route = createFileRoute("/checkout")({
+  validateSearch: (s: Record<string, unknown>): CheckoutSearch =>
+    s.canceled === "1" || s.canceled === true ? { canceled: true } : {},
+  component: CheckoutPage,
+});
 
 function CheckoutPage() {
   const { t } = useI18n();
@@ -25,10 +31,9 @@ function CheckoutPage() {
 
 function CheckoutForm() {
   const { t } = useI18n();
+  const canceled = Route.useSearch().canceled;
   const user = useCurrentUser();
-  const nav = useNavigate();
   const lines = useCart((s) => s.lines);
-  const clear = useCart((s) => s.clear);
   const products = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
   const byId = new Map((products.data ?? []).map((p) => [p.id, p]));
   const rows = lines
@@ -84,11 +89,10 @@ function CheckoutForm() {
           items: rows.map((r) => ({ productId: r.productId, qty: r.qty })),
         },
       });
-      clear();
-      toast.success(t("toast.order", { id: res.orderId }));
-      await nav({ to: "/account" });
+      if (!res.checkoutUrl) throw new Error("Could not start card checkout");
+      window.location.assign(res.checkoutUrl);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not place order");
+      toast.error(err instanceof Error ? err.message : "Could not start checkout");
     } finally {
       setBusy(false);
     }
@@ -109,6 +113,9 @@ function CheckoutForm() {
     <main className="mx-auto grid max-w-5xl gap-8 px-4 py-10 lg:grid-cols-2">
       <form className="space-y-4" onSubmit={submit}>
         <h1 className="text-3xl">{t("checkout.title")}</h1>
+        {canceled ? (
+          <p className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm">{t("checkout.canceled")}</p>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {t("checkout.lead")}{" "}
           <Link to="/contact" className="text-primary">
@@ -116,6 +123,7 @@ function CheckoutForm() {
           </Link>
           .
         </p>
+        <p className="text-sm text-muted-foreground">{t("checkout.payHint")}</p>
         <Field label={t("checkout.fullName")} value={name} onChange={setName} />
         <Field label={t("checkout.email")} type="email" value={email} onChange={setEmail} />
         <Field label={t("checkout.phone")} value={phone} onChange={setPhone} optional />

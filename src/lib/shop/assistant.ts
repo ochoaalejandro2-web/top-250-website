@@ -114,7 +114,7 @@ export function shopAssistantSystemPrompt(catalog: string): string {
             Catalog (gaming accessories only — never mention DMA cards, FPGA boards, firmware, or cheat hardware):
 ${catalog}
 
-Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and place the order. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard. Reply in the customer's language when they write in Spanish.`;
+Checkout: customers sign in (email/password, Google, or X), enter a US shipping address, pick USPS or UPS, and pay by card. They can contact the shop with a form before buying. The shop owner manages orders in the admin dashboard. Reply in the customer's language when they write in Spanish.`;
 }
 
 /**
