@@ -17,9 +17,12 @@ import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShippingRouteImport } from './routes/shipping'
+import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
+import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as ProductIdRouteImport } from './routes/product.$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiProductImageIdRouteImport } from './routes/api/product-image.$id'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe.webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -61,6 +64,16 @@ const ShippingRoute = ShippingRouteImport.update({
   path: '/shipping',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CheckoutRoute,
+} as any)
+const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => CheckoutRoute,
+} as any)
 const ProductIdRoute = ProductIdRouteImport.update({
   id: '/product/$id',
   path: '/product/$id',
@@ -76,32 +89,42 @@ const ApiProductImageIdRoute = ApiProductImageIdRouteImport.update({
   path: '/api/product-image/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe/webhook',
+  path: '/api/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
   '/shipping': typeof ShippingRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
+  '/checkout/': typeof CheckoutIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/product-image/$id': typeof ApiProductImageIdRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
   '/shipping': typeof ShippingRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
+  '/checkout': typeof CheckoutIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/product-image/$id': typeof ApiProductImageIdRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -109,13 +132,16 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
   '/shipping': typeof ShippingRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
+  '/checkout/': typeof CheckoutIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/product-image/$id': typeof ApiProductImageIdRoute
+  '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -128,22 +154,27 @@ export interface FileRouteTypes {
     | '/contact'
     | '/login'
     | '/shipping'
+    | '/checkout/success'
     | '/product/$id'
+    | '/checkout/'
     | '/api/auth/$'
     | '/api/product-image/$id'
+    | '/api/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
     | '/admin'
     | '/cart'
-    | '/checkout'
     | '/contact'
     | '/login'
     | '/shipping'
+    | '/checkout/success'
     | '/product/$id'
+    | '/checkout'
     | '/api/auth/$'
     | '/api/product-image/$id'
+    | '/api/stripe/webhook'
   id:
     | '__root__'
     | '/'
@@ -154,9 +185,12 @@ export interface FileRouteTypes {
     | '/contact'
     | '/login'
     | '/shipping'
+    | '/checkout/success'
     | '/product/$id'
+    | '/checkout/'
     | '/api/auth/$'
     | '/api/product-image/$id'
+    | '/api/stripe/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -164,13 +198,14 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
   CartRoute: typeof CartRoute
-  CheckoutRoute: typeof CheckoutRoute
+  CheckoutRoute: typeof CheckoutRouteWithChildren
   ContactRoute: typeof ContactRoute
   LoginRoute: typeof LoginRoute
   ShippingRoute: typeof ShippingRoute
   ProductIdRoute: typeof ProductIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiProductImageIdRoute: typeof ApiProductImageIdRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -231,6 +266,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShippingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout/': {
+      id: '/checkout/'
+      path: '/'
+      fullPath: '/checkout/'
+      preLoaderRoute: typeof CheckoutIndexRouteImport
+      parentRoute: typeof CheckoutRoute
+    }
+    '/checkout/success': {
+      id: '/checkout/success'
+      path: '/success'
+      fullPath: '/checkout/success'
+      preLoaderRoute: typeof CheckoutSuccessRouteImport
+      parentRoute: typeof CheckoutRoute
+    }
     '/product/$id': {
       id: '/product/$id'
       path: '/product/$id'
@@ -252,21 +301,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProductImageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stripe/webhook': {
+      id: '/api/stripe/webhook'
+      path: '/api/stripe/webhook'
+      fullPath: '/api/stripe/webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
+
+interface CheckoutRouteChildren {
+  CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  CheckoutIndexRoute: typeof CheckoutIndexRoute
+}
+
+const CheckoutRouteChildren: CheckoutRouteChildren = {
+  CheckoutSuccessRoute: CheckoutSuccessRoute,
+  CheckoutIndexRoute: CheckoutIndexRoute,
+}
+
+const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
+  CheckoutRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
   CartRoute: CartRoute,
-  CheckoutRoute: CheckoutRoute,
+  CheckoutRoute: CheckoutRouteWithChildren,
   ContactRoute: ContactRoute,
   LoginRoute: LoginRoute,
   ShippingRoute: ShippingRoute,
   ProductIdRoute: ProductIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiProductImageIdRoute: ApiProductImageIdRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

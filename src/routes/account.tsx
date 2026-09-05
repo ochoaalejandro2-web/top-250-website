@@ -38,7 +38,10 @@ function AccountPage() {
           <article key={o.id} className="neon-panel rounded-2xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <strong>{t("account.order", { id: o.id })}</strong>
-              <Badge>{o.status}</Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge>{o.status}</Badge>
+                {o.paidAt ? <Badge className="border-primary/40 text-primary">{t("success.paidBadge")}</Badge> : null}
+              </div>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {t("account.shipTo", {

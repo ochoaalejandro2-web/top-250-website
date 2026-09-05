@@ -37,6 +37,8 @@ export type OrderSummary = {
   status: string;
   notes: string | null;
   createdAt: string;
+  paidAt: string | null;
+  stripeSessionId: string | null;
   items: { productId: string; name: string; qty: number; priceCents: number }[];
 };
 
@@ -146,73 +148,25 @@ export const placeOrder = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ context, data }) => {
-    if (!data.items?.length) throw new Error("Cart is empty");
     const { getSessionUser } = await import("@/lib/auth/verify.server");
     const u = await getSessionUser();
     await ensureProfile(context.userId, data.email || u?.email, data.name);
-    const sql = await getSql();
-    const products = await sql<ProductRow>`select * from products`;
-    const wanted = new Set(data.items.map((i) => i.productId));
-    const byId = new Map(
-      products.filter((p) => wanted.has(p.id)).map((p) => [p.id, mapProduct(p)]),
-    );
-    let weight = 0;
-    let subtotal = 0;
-    const lines: { productId: string; name: string; qty: number; priceCents: number }[] = [];
-    for (const item of data.items) {
-      const p = byId.get(item.productId);
-      if (!p || !p.active) throw new Error("A product is no longer available");
-      if (item.qty < 1) continue;
-      if (p.stock < item.qty) throw new Error(`${p.name} only has ${p.stock} in stock`);
-      weight += p.weightLb * item.qty;
-      subtotal += p.priceCents * item.qty;
-      lines.push({ productId: p.id, name: p.fullName, qty: item.qty, priceCents: p.priceCents });
-    }
-    if (!lines.length) throw new Error("Cart is empty");
-    const quote = estimateShippingCents(data.zip, weight);
-    const method: Carrier = data.shippingMethod === "UPS" ? "UPS" : "USPS";
-    const shipping = quote[method];
-    const total = subtotal + shipping;
+    const { startStripeCheckout } = await import("./checkout.server");
+    return startStripeCheckout({ ...data, userId: context.userId });
+  });
 
-    const inserted = await sql<{ id: number }>`
-      insert into orders (
-        user_id, customer_name, email, phone, address, city, state, zip,
-        shipping_method, shipping_cents, subtotal_cents, total_cents, status, notes
-      ) values (
-        ${context.userId}, ${data.name.trim()}, ${data.email.trim()}, ${data.phone?.trim() || null},
-        ${data.address.trim()}, ${data.city.trim()}, ${data.state.trim().toUpperCase()}, ${data.zip.trim()},
-        ${method}, ${shipping}, ${subtotal}, ${total}, 'pending', ${data.notes?.trim() || null}
-      ) returning id`;
-    const orderId = inserted[0].id;
-    for (const line of lines) {
-      await sql`insert into order_items (order_id, product_id, name, qty, price_cents)
-        values (${orderId}, ${line.productId}, ${line.name}, ${line.qty}, ${line.priceCents})`;
-      await sql`update products set stock = stock - ${line.qty} where id = ${line.productId}`;
-    }
-    return { orderId, totalCents: total, shippingCents: shipping, method };
+export const confirmCheckout = createServerFn({ method: "POST" })
+  .validator((input: { sessionId: string }) => input)
+  .handler(async ({ data }) => {
+    const { confirmPaidCheckout } = await import("./checkout.server");
+    return confirmPaidCheckout(data.sessionId);
   });
 
 export const listMyOrders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const sql = await getSql();
-    const orders = await sql<{
-      id: number;
-      customer_name: string;
-      email: string;
-      phone: string | null;
-      address: string;
-      city: string;
-      state: string;
-      zip: string;
-      shipping_method: string;
-      shipping_cents: number;
-      subtotal_cents: number;
-      total_cents: number;
-      status: string;
-      notes: string | null;
-      created_at: string;
-    }>`select * from orders where user_id = ${context.userId} order by created_at desc`;
+    const orders = await sql<OrderRow>`select * from orders where user_id = ${context.userId} order by created_at desc`;
     return hydrateOrders(orders);
   });
 
@@ -221,45 +175,31 @@ export const listAllOrders = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireAdmin(context.userId);
     const sql = await getSql();
-    const orders = await sql<{
-      id: number;
-      customer_name: string;
-      email: string;
-      phone: string | null;
-      address: string;
-      city: string;
-      state: string;
-      zip: string;
-      shipping_method: string;
-      shipping_cents: number;
-      subtotal_cents: number;
-      total_cents: number;
-      status: string;
-      notes: string | null;
-      created_at: string;
-    }>`select * from orders order by created_at desc`;
+    const orders = await sql<OrderRow>`select * from orders order by created_at desc`;
     return hydrateOrders(orders);
   });
 
-async function hydrateOrders(
-  orders: {
-    id: number;
-    customer_name: string;
-    email: string;
-    phone: string | null;
-    address: string;
-    city: string;
-    state: string;
-    zip: string;
-    shipping_method: string;
-    shipping_cents: number;
-    subtotal_cents: number;
-    total_cents: number;
-    status: string;
-    notes: string | null;
-    created_at: string;
-  }[],
-): Promise<OrderSummary[]> {
+type OrderRow = {
+  id: number;
+  customer_name: string;
+  email: string;
+  phone: string | null;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  shipping_method: string;
+  shipping_cents: number;
+  subtotal_cents: number;
+  total_cents: number;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  paid_at?: string | null;
+  stripe_checkout_session_id?: string | null;
+};
+
+async function hydrateOrders(orders: OrderRow[]): Promise<OrderSummary[]> {
   if (!orders.length) return [];
   const sql = await getSql();
   const ids = orders.map((o) => o.id);
@@ -299,6 +239,8 @@ async function hydrateOrders(
     status: o.status,
     notes: o.notes,
     createdAt: o.created_at,
+    paidAt: o.paid_at ?? null,
+    stripeSessionId: o.stripe_checkout_session_id ?? null,
     items: byOrder.get(o.id) ?? [],
   }));
 }
