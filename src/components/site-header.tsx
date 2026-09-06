@@ -34,6 +34,9 @@ export function SiteHeader() {
           <Link to="/contact" className="text-white/85 hover:text-white">
             {t("nav.contact")}
           </Link>
+          <Link to="/reviews" className="text-white/85 hover:text-white">
+            {t("nav.reviews")}
+          </Link>
           {isAdmin ? (
             <Link to="/admin" className="font-semibold text-destructive">
               {t("nav.admin")}

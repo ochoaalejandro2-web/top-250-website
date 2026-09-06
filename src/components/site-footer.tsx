@@ -37,6 +37,11 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link to="/reviews" className="hover:text-primary">
+                {t("footer.reviews")}
+              </Link>
+            </li>
+            <li>
               <button type="button" className="hover:text-primary" onClick={() => openShopChat()}>
                 {t("footer.assistant")}
               </button>
