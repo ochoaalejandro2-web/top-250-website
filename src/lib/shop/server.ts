@@ -5,6 +5,15 @@ import { catalogAssistantReply, shopAssistantSystemPrompt } from "./assistant";
 import { isBlockedCatalogItem } from "./catalog";
 import { completeShopLlm } from "./llm";
 import { assertWritableCatalogItem, normalizeProductWrite, productPhotoPublicUrl } from "./persist";
+import {
+  SAMPLE_REVIEWS,
+  isReviewStatus,
+  mapReviewRow,
+  normalizeReviewInput,
+  publicReview,
+  type Review,
+  type ReviewStatus,
+} from "./reviews";
 import { estimateShippingCents, type Carrier } from "./shipping";
 
 export type Product = {
@@ -394,6 +403,83 @@ export const askShopAi = createServerFn({ method: "POST" })
     } catch {
       return { ok: true as const, text: fallback };
     }
+  });
+
+type ReviewRow = {
+  id: number;
+  name: string;
+  rating: number;
+  comment: string;
+  created_at: unknown;
+  status: string;
+};
+
+async function seedApprovedReviewsIfNeeded() {
+  const sql = await getSql();
+  const approved = await sql<{ c: number }>`
+    select count(*)::int as c from reviews where status = 'approved'`;
+  if (Number(approved[0]?.c ?? 0) > 0) return;
+  for (const seed of SAMPLE_REVIEWS) {
+    await sql`
+      insert into reviews (name, rating, comment, status, seed_key, created_at)
+      values (
+        ${seed.name},
+        ${seed.rating},
+        ${seed.comment},
+        'approved',
+        ${seed.seedKey},
+        ${seed.createdAt}
+      )
+      on conflict (seed_key) do nothing`;
+  }
+}
+
+export const listApprovedReviews = createServerFn({ method: "GET" }).handler(async () => {
+  await seedApprovedReviewsIfNeeded();
+  const sql = await getSql();
+  const rows = await sql<ReviewRow>`
+    select id, name, rating, comment, created_at, status
+    from reviews
+    where status = 'approved'
+    order by created_at desc`;
+  return rows.map(mapReviewRow).map(publicReview);
+});
+
+export const submitReview = createServerFn({ method: "POST" })
+  .validator((input: { name: string; rating: number; comment: string }) => input)
+  .handler(async ({ data }) => {
+    const row = normalizeReviewInput(data);
+    const sql = await getSql();
+    await sql`
+      insert into reviews (name, rating, comment, status)
+      values (${row.name}, ${row.rating}, ${row.comment}, 'pending')`;
+    return { ok: true as const, status: "pending" as const };
+  });
+
+export const listAdminReviews = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.userId);
+    await seedApprovedReviewsIfNeeded();
+    const sql = await getSql();
+    const rows = await sql<ReviewRow>`
+      select id, name, rating, comment, created_at, status
+      from reviews
+      order by
+        case status when 'pending' then 0 when 'approved' then 1 else 2 end,
+        created_at desc`;
+    return rows.map(mapReviewRow) satisfies Review[];
+  });
+
+export const updateReviewStatus = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: number; status: ReviewStatus }) => input)
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context.userId);
+    if (!isReviewStatus(data.status)) throw new Error("Invalid review status");
+    const sql = await getSql();
+    await sql`update reviews set status = ${data.status} where id = ${data.id}`;
+    return { ok: true as const };
   });
 
 export const submitContact = createServerFn({ method: "POST" })

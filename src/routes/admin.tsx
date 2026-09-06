@@ -8,12 +8,14 @@ import {
   becomeStoreAdmin,
   getMe,
   getStoreSettings,
+  listAdminReviews,
   listAllOrders,
   listContactMessages,
   removeProduct,
   saveProduct,
   saveStoreSettings,
   updateOrderStatus,
+  updateReviewStatus,
   uploadProductPhoto,
   type Product,
 } from "@/lib/shop/server";
@@ -34,7 +36,9 @@ function AdminPage() {
   const { t } = useI18n();
   const { user, isPending } = useCurrentUserState();
   const me = useQuery({ queryKey: ["me", user?.id], queryFn: () => getMe(), enabled: Boolean(user) });
-  const [tab, setTab] = useState<"products" | "orders" | "messages" | "settings">("products");
+  const [tab, setTab] = useState<"products" | "orders" | "messages" | "reviews" | "settings">(
+    "products",
+  );
 
   if (isPending || (user && me.isLoading)) {
     return <main className="mx-auto max-w-5xl px-4 py-16 text-muted-foreground">{t("common.loading")}</main>;
@@ -66,6 +70,7 @@ function AdminPage() {
             ["products", t("admin.tab.catalog")],
             ["orders", t("admin.tab.orders")],
             ["messages", t("admin.tab.messages")],
+            ["reviews", t("admin.tab.reviews")],
             ["settings", t("admin.tab.settings")],
           ] as const
         ).map(([id, label]) => (
@@ -77,6 +82,7 @@ function AdminPage() {
       {tab === "products" && <ProductsPanel />}
       {tab === "orders" && <OrdersPanel />}
       {tab === "messages" && <MessagesPanel />}
+      {tab === "reviews" && <ReviewsPanel />}
       {tab === "settings" && <SettingsPanel />}
     </main>
   );
@@ -285,6 +291,68 @@ function MessagesPanel() {
             {m.phone ? ` · ${m.phone}` : ""}
           </p>
           <p className="mt-3 text-sm whitespace-pre-wrap">{m.message}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ReviewsPanel() {
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["admin-reviews"], queryFn: () => listAdminReviews() });
+
+  async function setStatus(id: number, status: "approved" | "rejected") {
+    try {
+      await updateReviewStatus({ data: { id, status } });
+      await qc.invalidateQueries({ queryKey: ["admin-reviews"] });
+      await qc.invalidateQueries({ queryKey: ["reviews"] });
+      toast.success(t("toast.reviewStatus", { status }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+    }
+  }
+
+  if (q.isLoading) return <p className="mt-6 text-muted-foreground">{t("common.loading")}</p>;
+  if (!(q.data ?? []).length) return <p className="mt-6 text-muted-foreground">{t("admin.noReviews")}</p>;
+
+  const statusLabel: Record<string, string> = {
+    pending: t("admin.reviewPending"),
+    approved: t("admin.reviewApproved"),
+    rejected: t("admin.reviewRejected"),
+  };
+
+  return (
+    <div className="mt-6 space-y-4">
+      {(q.data ?? []).map((review) => (
+        <article key={review.id} className="neon-panel rounded-2xl p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong>{review.name}</strong>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{statusLabel[review.status] ?? review.status}</Badge>
+              <span className="text-sm text-primary">{"★".repeat(review.rating)}</span>
+            </div>
+          </div>
+          {review.createdAt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              }).format(new Date(review.createdAt))}
+            </p>
+          ) : null}
+          <p className="mt-3 text-sm whitespace-pre-wrap">{review.comment}</p>
+          {review.status === "pending" ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => void setStatus(review.id, "approved")}>
+                {t("admin.reviewApprove")}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void setStatus(review.id, "rejected")}>
+                {t("admin.reviewReject")}
+              </Button>
+            </div>
+          ) : null}
         </article>
       ))}
     </div>

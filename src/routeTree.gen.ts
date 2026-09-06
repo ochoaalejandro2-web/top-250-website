@@ -16,6 +16,7 @@ import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
@@ -57,6 +58,11 @@ const ContactRoute = ContactRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShippingRoute = ShippingRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRouteWithChildren
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
+  '/reviews': typeof ReviewsRoute
   '/shipping': typeof ShippingRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
+  '/reviews': typeof ReviewsRoute
   '/shipping': typeof ShippingRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRouteWithChildren
   '/contact': typeof ContactRoute
   '/login': typeof LoginRoute
+  '/reviews': typeof ReviewsRoute
   '/shipping': typeof ShippingRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/product/$id': typeof ProductIdRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/login'
+    | '/reviews'
     | '/shipping'
     | '/checkout/success'
     | '/product/$id'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/contact'
     | '/login'
+    | '/reviews'
     | '/shipping'
     | '/checkout/success'
     | '/product/$id'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/login'
+    | '/reviews'
     | '/shipping'
     | '/checkout/success'
     | '/product/$id'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRouteWithChildren
   ContactRoute: typeof ContactRoute
   LoginRoute: typeof LoginRoute
+  ReviewsRoute: typeof ReviewsRoute
   ShippingRoute: typeof ShippingRoute
   ProductIdRoute: typeof ProductIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shipping': {
@@ -333,6 +353,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRouteWithChildren,
   ContactRoute: ContactRoute,
   LoginRoute: LoginRoute,
+  ReviewsRoute: ReviewsRoute,
   ShippingRoute: ShippingRoute,
   ProductIdRoute: ProductIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
